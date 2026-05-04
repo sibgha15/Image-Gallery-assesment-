@@ -1,97 +1,111 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Image Gallery (React Native assessment)
 
-# Getting Started
+React Native **0.85** app demonstrating Redux Toolkit, Apollo Client (GraphQL), a custom **DeviceDetails** native module, form validation, Reanimated animations, and a performant image grid.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Prerequisites
 
-## Step 1: Start Metro
+- Node.js **22+** (see `package.json` engines)
+- Watchman (recommended for Metro)
+- **Android**: Android Studio, SDK, and `ANDROID_HOME` set (or `android/local.properties` with `sdk.dir=...`)
+- **iOS**: Xcode **15+**, CocoaPods (`pod` CLI)
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Install
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+From the project root:
 
 ```sh
-# Using npm
+npm install
+```
+
+**iOS native dependencies** (after installs or when native deps change):
+
+```sh
+cd ios && pod install && cd ..
+```
+
+## Run
+
+Start Metro in one terminal:
+
+```sh
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+If you see **`[Worklets] Failed to create a worklet`**, stop Metro, clear its cache, and rebuild the native app (Babel must emit worklets; a stale bundle will crash at runtime):
 
 ```sh
-# Using npm
+npm start -- --reset-cache
+```
+
+Then run **Clean Build Folder** in Xcode (or `cd ios && xcodebuild clean`) and `npm run ios` again.
+
+**Android** (device or emulator):
+
+```sh
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+**iOS** (Simulator):
 
 ```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## Tests and lint
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```sh
+npm test
+npm run lint
+```
 
-## Step 3: Modify your app
+## What this app does
 
-Now that you have successfully run the app, let's make changes!
+### Registration
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+- Fields: **Name**, **Email**, **Phone**, **Password**
+- **Email**: standard format check
+- **Phone**: exactly **10 digits**, numbers only (non-digits stripped while typing)
+- **Password**: minimum **8** characters
+- Inline error messages; on success, navigates to the gallery (password is not stored in Redux)
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+### Gallery (GraphQL + Redux)
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+- **GraphQL**: [Rick and Morty API](https://rickandmortyapi.com/graphql) — characters are shown as gallery items (**image**, **title** = name, **author** = species, **likes** = episode count plus your local “like” toggle)
+- **Redux** holds: image list, per-user liked ids, loading, and error state
+- **Grid** (`FlatList`, two columns), **pull-to-refresh**, tap to open details, **like** on the card
+- **Performance**: tuned `FlatList` props (`windowSize`, `maxToRenderPerBatch`, `removeClippedSubviews` on Android)
 
-## Congratulations! :tada:
+### Image details + animations (Reanimated)
 
-You've successfully run and modified your React Native App. :partying_face:
+- Full image, title, author (species), generated **description**, total likes
+- **Zoom / fade-in** when the hero image appears
+- **Like**: spring scale on the heart control plus a short **burst** heart overlay
 
-### Now what?
+### Native module: `DeviceDetails`
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+- **Android** (required): Kotlin module `DeviceDetails` exposes `getDeviceDetails()` → brand, manufacturer, model, device, product, `systemVersion`, `sdkInt`
+- **iOS** (optional): Swift + `RCT_EXTERN_MODULE` bridge, same JS API with Apple-oriented fields where applicable
+- JS wrapper: `src/native/DeviceDetails.ts`; UI: expandable **Device (native bridge)** card on the gallery screen
 
-# Troubleshooting
+## Project layout (high level)
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+| Path | Role |
+|------|------|
+| `App.tsx` | Providers (Redux, Apollo, gesture handler, safe area) + navigator |
+| `src/apollo/client.ts` | Apollo `HttpLink` + `InMemoryCache` |
+| `src/graphql/` | Queries + TypeScript result shapes |
+| `src/store/` | Redux slices (`auth`, `gallery`) |
+| `src/screens/` | Registration, gallery, image detail |
+| `src/navigation/` | Native stack + types |
+| `android/.../DeviceDetails*.kt` | Android native module + package registration |
+| `ios/imageGallery/DeviceDetails*.swift/m` | iOS native module |
 
-# Learn More
+## Notes for reviewers
 
-To learn more about React Native, take a look at the following resources:
+- Network access is required for the public GraphQL endpoint.
+- “Likes” from the API are approximated by **episode count**; Redux adds **+1** when you tap like (local only).
+- Reanimated **4** is used with the **New Architecture** (`newArchEnabled=true` on Android). `babel.config.js` lists **`react-native-worklets/plugin` last**, as required by the [Reanimated 4 RN CLI install guide](https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started/#react-native-community-cli).
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## License
+
+Private / assessment use unless you add your own license.
